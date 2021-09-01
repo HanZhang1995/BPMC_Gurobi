@@ -1,0 +1,105 @@
+import xlrd
+import numpy as np
+rnd = np.random
+rnd.seed(0)
+S = {0:10,1:10,2:10,3:10,4:10,5:28,6:28,7:28,8:70,9:70}#machine capacity
+
+n = 10 #number of job
+instance = 10 #file name format 
+for s in range(0,5):
+    if s == 0:
+        n = 10
+    elif s == 1:
+        n = 20
+    elif s == 2:
+        n = 30
+    elif s == 3:
+        n = 40
+    elif s == 4:
+        n = 50
+    for t in range(1,11):
+        instance = t
+        l = 5 #number of clients 
+        m = 10 #number of machines
+        data = xlrd.open_workbook('job_information_2_%d_%d.xlsx'%(n,instance))
+        data.sheet_names()
+        table = data.sheets()[0]
+
+        pj=[]
+        sj=[]
+        rj=[]
+        kj=[]
+        qik=[]
+        M = [i for i in range(0, m)]
+        K = [i for i in range(0, l)]
+        Q = {(i, k): 0 for i in M for k in K}#
+        for rownum in range(table.nrows):
+            if rownum == 0:
+                pj = table.row_values(rownum)
+            if rownum == 1:
+                sj = table.row_values(rownum)
+            if rownum == 2:
+                rj = table.row_values(rownum)
+            if rownum == 3:
+                kj = table.row_values(rownum)
+            if rownum == 4:
+                qik = table.row_values(rownum)
+
+        for i in M:
+            for k in K:
+                Q[i,k]=qik[i*len(K)+k]
+
+        N = [i for i in range(0, n)]
+        NN = [i for i in range(1, n)]
+        J = {i:(pj[i],sj[i],rj[i]) for i in N}
+
+#         Y = [(j, k) for j in N for k in K]#Ybi
+        # print(rnd.randint(1, 10, 1))
+        BI = [(b, i) for b in N for i in M]
+        # Q = {(i, k): rnd.randint(1, 10, 1) for i in M for k in K}#import
+        # B = [i for i in range(0, n)]
+        X = [(j,b,i) for j in N for b in N for i in M]#Xjbi
+
+        from gurobipy import Model, GRB, quicksum
+        mdl = Model('MIP')
+        x = mdl.addVars(X, vtype=GRB.BINARY,name='X_jbi')
+#         y = mdl.addVars(Y, vtype=GRB.BINARY,name='Y_jk')
+        d = mdl.addVars(N, vtype=GRB.INTEGER,name='D_j')
+        P = mdl.addVars(BI, vtype=GRB.INTEGER,name='P_bi')
+        C = mdl.addVars(BI, vtype=GRB.INTEGER,name='C_bi')
+        c = mdl.addVars(N, vtype=GRB.INTEGER,name='c_j')
+        ST = mdl.addVars(BI, vtype=GRB.INTEGER,name='ST_bi')
+
+#         for j in N:
+#             y[j,kj[j]].LB = 1.0
+
+        mdl.modelSense = GRB.MINIMIZE
+        mdl.setObjective(quicksum(d[i] for i in N))
+
+        mdl.addConstrs(quicksum(x[j,b,i] for b in N for i in M) == 1 for j in N )
+#         mdl.addConstrs(quicksum(y[j, k] for k in K) == 1 for j in N)
+        mdl.addConstrs(quicksum(x[j,b,i]*sj[j] for j in N)<=S[i] for b in N for i in M)
+        mdl.addConstrs(x[j,b,i]*pj[j]<=P[b,i] for j in N for b in N for i in M)
+        mdl.addConstrs(x[j,b,i]*rj[j]<=ST[b,i] for j in N for b in N for i in M)
+        mdl.addConstrs(C[b,i]>=ST[b,i]+P[b,i] for b in N for i in M)
+        mdl.addConstrs(C[b-1,i]<=ST[b,i] for b in NN for i in M)
+        mdl.addConstrs(c[j]>=C[b,i]*x[j,b,i] for j in N for b in N for i in M)
+#       mdl.addConstrs(d[j]>=c[j]+Q[i,k]*y[j, k]*quicksum(x[j,b,i] for b in N) for j in N for i in M for k in K)
+        mdl.addConstrs(d[j]>=c[j]+Q[i,kj[j]]*quicksum(x[j,b,i] for b in N) for j in N for i in M for k in K)
+        mdl.addConstrs(d[j]>=0 for j in N)
+        mdl.addConstrs(c[j]>=0 for j in N)
+        mdl.addConstrs(P[b,i]>=0 for b in N for i in M)
+        mdl.addConstrs(C[b,i]>=0 for b in N for i in M)
+
+        mdl.Params.TimeLimit = 1800  # seconds
+        mdl.optimize()
+        print(mdl.objVal)
+        str1 = 'gurobi_uniform_'+str(n)+'_'+str(instance)+'.txt'
+        data = []
+        data.append(mdl.objVal)
+        data.append(mdl.MIPGap)
+        data.append(mdl.Runtime)
+        print(data)
+        np.savetxt(str1,data)#write to file 
+
+
