@@ -83,7 +83,7 @@ for s in range(0,5):
         mdl.addConstrs(x[j,b,i]*rj[j]<=ST[b,i] for j in N for b in N for i in M)
         mdl.addConstrs(C[b,i]>=ST[b,i]+P[b,i] for b in N for i in M)
         mdl.addConstrs(C[b-1,i]<=ST[b,i] for b in NN for i in M)
-        mdl.addConstrs(c[j]>=C[b,i]-100000000000*(1-x[j,b,i]) for j in N for b in N for i in M)
+        mdl.addConstrs(c[j]>=C[b,i]-10000*(1-x[j,b,i]) for j in N for b in N for i in M)//10000 represents a very large number. Be careful not to take too large numbers, and the reason is that BINARY is not binary but a floating-point number less than 1
         mdl.addConstrs(d[j]>=c[j]+Q[i,kj[j]]*quicksum(x[j,b,i] for b in N) for j in N for i in M for k in K)
         mdl.addConstrs(d[j]>=0 for j in N)
         mdl.addConstrs(c[j]>=0 for j in N)
